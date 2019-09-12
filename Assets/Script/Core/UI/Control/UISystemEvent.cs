@@ -13,15 +13,27 @@ public class UISystemEvent
     /// </summary>
     /// <param name="Event">事件类型</param>
     /// <param name="callback">回调函数</param>
-    public static void RegisterAllUIEvent(UIEvent l_UIEvent, UICallBack l_CallBack)
+    public static void RegisterAllUIEvent(UIEvent UIEvent, UICallBack CallBack)
     {
-        if (s_allUIEvents.ContainsKey(l_UIEvent))
+        if (s_allUIEvents.ContainsKey(UIEvent))
         {
-            s_allUIEvents[l_UIEvent] += l_CallBack;
+            s_allUIEvents[UIEvent] += CallBack;
         }
         else
         {
-            s_allUIEvents.Add(l_UIEvent,l_CallBack);
+            s_allUIEvents.Add(UIEvent,CallBack);
+        }
+    }
+
+    public static void RemoveAllUIEvent(UIEvent UIEvent, UICallBack l_CallBack)
+    {
+        if (s_allUIEvents.ContainsKey(UIEvent))
+        {
+            s_allUIEvents[UIEvent] -= l_CallBack;
+        }
+        else
+        {
+            Debug.LogError("RemoveAllUIEvent don't exits: " + UIEvent);
         }
     }
 
@@ -30,66 +42,80 @@ public class UISystemEvent
     /// </summary>
     /// <param name="Event">事件类型</param>
     /// <param name="callback"回调函数></param>
-    public static void RegisterEvent(string l_UIName,UIEvent l_UIEvent, UICallBack l_CallBack)
+    public static void RegisterEvent(string UIName,UIEvent UIEvent, UICallBack CallBack)
     {
-        if (s_singleUIEvents.ContainsKey(l_UIName))
+        if (s_singleUIEvents.ContainsKey(UIName))
         {
-            if (s_singleUIEvents[l_UIName].ContainsKey(l_UIEvent))
+            if (s_singleUIEvents[UIName].ContainsKey(UIEvent))
             {
-                s_singleUIEvents[l_UIName][l_UIEvent] += l_CallBack;
+                s_singleUIEvents[UIName][UIEvent] += CallBack;
             }
             else
             {
-                s_singleUIEvents[l_UIName].Add(l_UIEvent,l_CallBack);
+                s_singleUIEvents[UIName].Add(UIEvent,CallBack);
             }
         }
         else
         {
-            s_singleUIEvents.Add(l_UIName,new Dictionary<UIEvent,UICallBack>());
-            s_singleUIEvents[l_UIName].Add(l_UIEvent, l_CallBack);
+            s_singleUIEvents.Add(UIName,new Dictionary<UIEvent,UICallBack>());
+            s_singleUIEvents[UIName].Add(UIEvent, CallBack);
         }
     }
 
-    public static void Dispatch(UIWindowBase l_UI, UIEvent l_UIEvent,params object[] l_objs)
+    public static void RemoveEvent(string UIName, UIEvent UIEvent, UICallBack CallBack)
     {
-        if (l_UI == null)
+        if (s_singleUIEvents.ContainsKey(UIName))
+        {
+            if (s_singleUIEvents[UIName].ContainsKey(UIEvent))
+            {
+                s_singleUIEvents[UIName][UIEvent] -= CallBack;
+            }
+            else
+            {
+                Debug.LogError("RemoveEvent 不存在的事件！ UIName " + UIName + " UIEvent " + UIEvent);
+            }
+
+        }
+        else
+        {
+            Debug.LogError("RemoveEvent 不存在的事件！ UIName " + UIName + " UIEvent " + UIEvent);
+        }
+    }
+
+    public static void Dispatch(UIWindowBase UI, UIEvent UIEvent,params object[] objs)
+    {
+        if (UI == null)
         {
             Debug.LogError("Dispatch l_UI is null!");
 
             return;
         }
 
-        if (s_allUIEvents.ContainsKey(l_UIEvent))
+        if (s_allUIEvents.ContainsKey(UIEvent))
         {
-            //遍历委托链表
-            foreach (UICallBack callBack in s_allUIEvents[l_UIEvent].GetInvocationList())
+            try
+            {
+                if(s_allUIEvents[UIEvent] != null)
+                    s_allUIEvents[UIEvent](UI, objs);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("UISystemEvent Dispatch error:" + e.ToString());
+            }
+        }
+
+        if (s_singleUIEvents.ContainsKey(UI.name))
+        {
+            if (s_singleUIEvents[UI.name].ContainsKey(UIEvent))
             {
                 try
                 {
-                    callBack(l_UI, l_objs);
+                    if (s_singleUIEvents[UI.name][UIEvent] != null)
+                        s_singleUIEvents[UI.name][UIEvent](UI, objs);
                 }
                 catch (Exception e)
                 {
                     Debug.LogError("UISystemEvent Dispatch error:" + e.ToString());
-                }
-            }
-        }
-
-        if (s_singleUIEvents.ContainsKey(l_UI.name))
-        {
-            if (s_singleUIEvents[l_UI.name].ContainsKey(l_UIEvent))
-            {
-                //遍历委托链表
-                foreach (UICallBack callBack in s_singleUIEvents[l_UI.name][l_UIEvent].GetInvocationList())
-                {
-                    try
-                    {
-                        callBack(l_UI, l_objs);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogError("UISystemEvent Dispatch error:" + e.ToString());
-                    }
                 }
             }
         }

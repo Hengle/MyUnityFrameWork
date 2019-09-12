@@ -4,7 +4,6 @@ using System;
 
 public class TimerEvent
 {
-
     public string m_timerName = "";
 
     /// <summary>
@@ -25,6 +24,8 @@ public class TimerEvent
 
     public bool m_isDone = false;
 
+    public bool m_isStop = false;
+
     public void Update()
     {
         if (m_isIgnoreTimeScale)
@@ -44,19 +45,9 @@ public class TimerEvent
 
     public void CompleteTimer()
     {
-        if (m_callBack != null)
-        {
-            try
-            {
-                m_callBack(m_objs);
-            }
-            catch(Exception e)
-            {
-                Debug.LogError(e.ToString());
-            }
-        }
+        CallBackTimer();
         
-        if(m_repeatCount>0)
+        if(m_repeatCount > 0)
         {
             m_currentRepeat++;
         }
@@ -68,10 +59,51 @@ public class TimerEvent
         }
     }
 
+    public void CallBackTimer()
+    {
+        if(this == Timer.test)
+        {
+            Debug.Log("CallBackTimer " + (m_callBack == null));
+        }
+
+        if (m_callBack != null)
+        {
+            try
+            {
+                m_callBack(m_objs);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e.ToString());
+            }
+        }
+    }
+
     public void ResetTimer()
     {
         m_currentTimer = 0;
         m_currentRepeat = 0;
+    }
+
+    public void OnInit() { }
+
+    public void OnPop()
+    {
+        m_timerName = "";
+        m_repeatCount = 0;
+        m_currentRepeat = 0;
+        m_isIgnoreTimeScale = false;
+        m_callBack = null;
+        m_objs = null;
+        m_timerSpace = 0; ;
+        m_currentTimer = 0;
+        m_isDone = false;
+        m_isStop = false;
+    }
+
+    public void OnPush()
+    {
+        m_isStop = true;
     }
 }
 

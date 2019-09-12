@@ -10,9 +10,9 @@ namespace Framework
         [Test(Description="UIManager 加载测试")]
         public void UIManagerLoadTest()
         {
-            ResourcesConfigManager.Initialize();
+            //ResourcesConfigManager.Initialize();
 
-            GameObject manager = GameObjectManager.CreatGameObject("UIManager");
+            GameObject manager = GameObjectManager.CreateGameObjectByPool("UIManager");
 
             Assert.AreNotEqual(manager.GetComponent<UILayerManager>(), null);
             Assert.AreNotEqual(manager.GetComponent<UIAnimManager>(), null);

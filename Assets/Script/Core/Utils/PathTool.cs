@@ -4,23 +4,22 @@ using System.Text;
 
 public class PathTool
 {
-
-    public static string GetPath(ResLoadType loadType)
+    public static string GetPath(ResLoadLocation loadType)
     {
         StringBuilder path = new StringBuilder();
         switch (loadType)
         {
-            case ResLoadType.Resource:
+            case ResLoadLocation.Resource:
 #if UNITY_EDITOR
                 path.Append(Application.dataPath);
                 path.Append("/Resources/");
                 break;
 #endif
 
-            case ResLoadType.Streaming:
+            case ResLoadLocation.Streaming:
 
 #if UNITY_ANDROID && !UNITY_EDITOR
-
+                //path.Append("file://");
                 path.Append(Application.dataPath );
                 path.Append("!assets/");
 #else
@@ -29,12 +28,12 @@ public class PathTool
 #endif
                 break;
 
-            case ResLoadType.Persistent:
+            case ResLoadLocation.Persistent:
                 path.Append(Application.persistentDataPath);
                 path.Append("/");
                 break;
 
-            case ResLoadType.Catch:
+            case ResLoadLocation.Catch:
                 path.Append(Application.temporaryCachePath);
                 path.Append("/");
                 break;
@@ -45,7 +44,14 @@ public class PathTool
         }
         return path.ToString();
     }
-
+    /// <summary>
+    /// 更新资源存放在Application.persistentDataPath+"/Resources/"目录下
+    /// </summary>
+    /// <returns></returns>
+    public static string GetAssetsBundlePersistentPath()
+    {
+        return Application.persistentDataPath + "/Resources/";
+    }
 
     /// <summary>
     /// 组合绝对路径
@@ -53,10 +59,26 @@ public class PathTool
     /// <param name="loadType">资源加载类型</param>
     /// <param name="relativelyPath">相对路径</param>
     /// <returns>绝对路径</returns>
-    public static string GetAbsolutePath(ResLoadType loadType, string relativelyPath)
+    public static string GetAbsolutePath(ResLoadLocation loadType, string relativelyPath)
     {
         return GetPath(loadType) + relativelyPath;
     }
+
+#if UNITY_WEBGL
+    /// <summary>
+    /// 获取加载URL
+    /// </summary>
+    /// <param name="relativelyPath">相对路径</param>
+    /// <returns></returns>
+    public static string GetLoadURL(string relativelyPath)
+    {
+#if UNITY_EDITOR
+        return "file://" + Application.streamingAssetsPath + "/" + relativelyPath;
+#else
+        return Application.absoluteURL + "StreamingAssets/" + relativelyPath;
+#endif
+    }
+#endif
 
     //获取相对路径
     public static string GetRelativelyPath(string path, string fileName, string expandName)
@@ -70,6 +92,22 @@ public class PathTool
 
         return builder.ToString();
     }
+
+    /// <summary>
+    /// 获取某个目录下的相对路径
+    /// </summary>
+    /// <param name="FullPath">完整路径</param>
+    /// <param name="DirectoryPath">目标目录</param>
+    public static string GetDirectoryRelativePath(string DirectoryPath,string FullPath)
+    {
+       DirectoryPath = DirectoryPath.Replace(@"\", "/");
+       FullPath = FullPath.Replace(@"\", "/");
+
+       FullPath = FullPath.Replace(DirectoryPath, "");
+
+        return FullPath;
+    }
+
 
     #if UNITY_EDITOR
 

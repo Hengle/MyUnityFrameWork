@@ -1,133 +1,76 @@
 ﻿using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using MiniJSON;
-using System.Text;
 using System;
 
 /*
  * 数据管理器，只读，可热更新，可使用默认值
  * 通过ResourceManager加载
  * */
-public class DataManager 
+public class DataManager
 {
     public const string c_directoryName = "Data";
-    public const string c_expandName    = "txt";
+    public const string c_expandName = "txt";
 
     /// <summary>
     /// 数据缓存
     /// </summary>
-    static Dictionary<string, DataTable> s_dataCatch = new Dictionary<string, DataTable>();
+    static Dictionary<string, DataTable> s_dataCache = new Dictionary<string, DataTable>();
 
     public static bool GetIsExistData(string DataName)
     {
-        string dataJson = ResourceIOTool.ReadStringByResource(
-        PathTool.GetRelativelyPath(c_directoryName,
-                                    DataName,
-                                    c_expandName));
-
-        if (dataJson == "")
-        {
-            return false;
-        }
-        else
-        {
-            return true;
-        }
+        return ResourcesConfigManager.GetIsExitRes(DataName);
     }
 
     public static DataTable GetData(string DataName)
     {
-
-        if(s_dataCatch.ContainsKey(DataName))
+        try
         {
-            return s_dataCatch[DataName];
+            //编辑器下不处理缓存
+            if (s_dataCache.ContainsKey(DataName))
+            {
+                return s_dataCache[DataName];
+            }
+
+            DataTable data = null;
+            string dataJson = "";
+
+            if (Application.isPlaying)
+            {
+                dataJson = ResourceManager.LoadText(DataName);
+            }
+            else
+            {
+                dataJson = ResourceIOTool.ReadStringByResource(
+                        PathTool.GetRelativelyPath(c_directoryName,
+                                                    DataName,
+                                                    c_expandName));
+            }
+
+            if (dataJson == "")
+            {
+                throw new Exception("Dont Find ->" + DataName + "<-");
+            }
+            data = DataTable.Analysis(dataJson);
+            data.m_tableName = DataName;
+
+            s_dataCache.Add(DataName, data);
+            return data;
         }
-
-        DataTable data = null;
-
-        string dataJson = "";
-
-        #if UNITY_EDITOR
-            dataJson = ResourceIOTool.ReadStringByResource(
-                    PathTool.GetRelativelyPath(c_directoryName,
-                                                DataName,
-                                                c_expandName));
-        #else
-            dataJson = ResourceManager.ReadTextFile(DataName);
-        #endif
-
-        if (dataJson == "")
+        catch (Exception e)
         {
-            throw new Exception("Dont Find " + DataName);
+            throw new Exception("GetData Exception ->" + DataName + "<- : " + e.ToString());
         }
-
-        data = DataTable.Analysis(dataJson);
-        data.m_tableName = DataName;
-
-        s_dataCatch.Add(DataName, data);
-
-        return data;
     }
 
     /// <summary>
     /// 清除缓存
     /// </summary>
-    public static void CleanCatch()
+    public static void CleanCache()
     {
-        s_dataCatch.Clear();
-    }
-
-    //只在编辑器下能够使用
-    #if UNITY_EDITOR
-
-    public static void SaveData(string ConfigName, DataTable data)
-    {
-        ResourceIOTool.WriteStringByFile(
-            PathTool.GetAbsolutePath(
-                ResLoadType.Resource,
-                PathTool.GetRelativelyPath(
-                    c_directoryName,
-                    ConfigName,
-                    c_expandName)), 
-            DataTable.Serialize(data));
-
-        UnityEditor.AssetDatabase.Refresh();
-    }
-
-    /// <summary>
-    /// 读取编辑器数据
-    /// </summary>
-    /// <param name="ConfigName">数据名称</param>
-    public static Dictionary<string, object> GetEditorData(string dataName)
-    {
-        UnityEditor.AssetDatabase.Refresh();
-
-        string dataJson = ResourceIOTool.ReadStringByFile(PathTool.GetEditorPath(c_directoryName, dataName, c_expandName));
-
-        if (dataJson == "")
+        foreach (var item in s_dataCache.Keys)
         {
-            Debug.Log(dataName + " dont find!");
-            return new Dictionary<string,object>();
+            ResourceManager.DestoryAssetsCounter(item);
         }
-        else
-        {
-            return Json.Deserialize(dataJson) as Dictionary<string, object>;
-        }
+        s_dataCache.Clear();
     }
-
-    /// <summary>
-    /// 保存编辑器数据
-    /// </summary>
-    /// <param name="ConfigName">数据名称</param>
-    /// <param name="data">数据表</param>
-    public static void SaveEditorData(string ConfigName, Dictionary<string, object> data)
-    {
-        string configDataJson = Json.Serialize(data);
-
-        ResourceIOTool.WriteStringByFile(PathTool.GetEditorPath(c_directoryName, ConfigName, c_expandName), configDataJson);
-
-        UnityEditor.AssetDatabase.Refresh();
-    }
-    #endif
 }

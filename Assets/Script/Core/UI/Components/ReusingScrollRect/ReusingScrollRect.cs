@@ -2,38 +2,69 @@
 using System.Collections;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using System;
 
 public class ReusingScrollRect : ScrollRectInput
 {
     public string m_ItemName = "";
 
     //默认是从上到下，从左到右，勾上此选项则反向
-    public bool m_isInversion;
+    public bool m_isInversion = false;
+    //是否接受操作
+    public bool m_isReceiveControl = true;
 
     public List<Dictionary<string, object>> m_datas = new List<Dictionary<string, object>>();
     public List<ReusingScrollItemBase> m_items = new List<ReusingScrollItemBase>();
-    public List<ReusingScrollItemBase> m_itemCatchs = new List<ReusingScrollItemBase>();
+    public List<ReusingScrollItemBase> m_itemCaches = new List<ReusingScrollItemBase>();
+
+    //RectTransform m_rectTransform;
 
     private Bounds m_viewBounds;
-    GameObject m_itemPrefab;
+    public GameObject m_itemPrefab;
 
-    Vector3 m_itemSize;
+    public Vector3 m_itemSize;
 
     #region 公共方法
 
-    public  void Init(string UIEventKey,string itemName)
+    public void SetItem(string itemName)
     {
-        base.Init(UIEventKey);
-
         m_ItemName = itemName;
+        //m_rectTransform = GetComponent<RectTransform>();
 
         Rebuild(CanvasUpdate.Layout);
 
-        UpdateBounds();
+        UpdateBound();
         SetLayout();
 
-        m_itemPrefab = ResourceManager.Load<GameObject>(m_ItemName);
+        m_itemPrefab = GameObjectManager.CreateGameObjectByPool(m_ItemName);
         m_itemSize = m_itemPrefab.GetComponent<RectTransform>().sizeDelta;
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+
+        for (int i = 0; i < m_items.Count; i++)
+        {
+            GameObjectManager.DestroyGameObjectByPool(m_items[i].gameObject);
+        }
+        m_items.Clear();
+
+        for (int i = 0; i < m_itemCaches.Count; i++)
+        {
+            GameObjectManager.DestroyGameObjectByPool(m_itemCaches[i].gameObject);
+        }
+        m_itemCaches.Clear();
+    }
+
+    public void Refresh()
+    {
+        for (int i = 0; i < m_items.Count; i++)
+        {
+            m_items[i].SetContent(m_items[i].m_index, m_datas[m_items[i].m_index]);
+        }
+
+        SetItemDisplay();
     }
 
 
@@ -62,26 +93,38 @@ public class ReusingScrollRect : ScrollRectInput
 
     public Vector3 GetItemAnchorPos(int index)
     {
+        if (content == null)
+        {
+            throw new Exception("SetItemDisplay Exception: content is null !");
+        }
+
         return GetItemPos(index) + GetRealItemOffset() + content.localPosition;
     }
 
     public void SetPos(Vector3 pos)
     {
+        if (content == null)
+        {
+            throw new Exception("SetItemDisplay Exception: content is null !");
+        }
+
         content.anchoredPosition3D = pos;
 
         SetItemDisplay();
     }
 
-    #endregion 
+    #endregion
 
     #region 继承方法
-    //protected override void SetContentAnchoredPosition(Vector2 position)
-    //{
-    //    InputUIEventProxy.DispatchScrollEvent("", "", position);
-
-    //    //base.SetContentAnchoredPosition(position);
-    //    //SetItemDisplay();
-    //}
+    bool m_rebuild = false;
+    public void Update()
+    {
+       if(m_rebuild)
+        {
+            m_rebuild = false;
+            SetItemDisplay();
+        }
+    }
 
     protected override void OnSetContentAnchoredPosition(InputUIOnScrollEvent e)
     {
@@ -89,12 +132,18 @@ public class ReusingScrollRect : ScrollRectInput
         SetItemDisplay();
     }
 
+    protected override void Start()
+    {
+        base.Start();
+        SetItemDisplay();
+    }
+
     public override void Rebuild(CanvasUpdate executing)
     {
         base.Rebuild(executing);
 
-        UpdateBounds();
-        SetItemDisplay();
+        UpdateBound();
+        m_rebuild = true;
     }
 
     #endregion
@@ -109,7 +158,7 @@ public class ReusingScrollRect : ScrollRectInput
         content.anchoredPosition3D = Vector3.zero;
     }
 
-    void UpdateBounds()
+    void UpdateBound()
     {
         m_viewBounds = new Bounds(viewRect.rect.center, viewRect.rect.size);
     }
@@ -118,17 +167,21 @@ public class ReusingScrollRect : ScrollRectInput
     {
         Vector3 size = m_itemSize;
 
-        if(horizontal)
+        if (horizontal)
         {
             size.x *= count;
+            size.y = 0;
         }
 
         if(vertical)
         {
             size.y *= count;
+            size.x = 0;
         }
 
         content.sizeDelta = size;
+
+        //Debug.Log(m_itemSize + "" + size + " m_rectTransform.sizeDelta " + m_rectTransform.sizeDelta, m_rectTransform );
     }
 
     void UpdateIndexList(int count)
@@ -153,26 +206,18 @@ public class ReusingScrollRect : ScrollRectInput
     }
 
     List<ReusingData> m_indexList = new List<ReusingData>();
-    bool m_clip = false;   //剪枝标志位，性能优化使用
-    int m_startPos = 0;
-    void SetItemDisplay()
+
+    void SetItemDisplay(bool isRebuild = false)
     {
-        m_clip = false;
+        if(content == null)
+        {
+            throw new Exception("SetItemDisplay Exception: content is null !");
+        }
+
         //计算已显示的哪些需要隐藏
         for (int i = 0; i < m_items.Count; i++)
         {
-            if (!m_clip)
-            {
-                m_startPos = m_items[i].m_index;
-                m_clip = true;
-            }
-            else
-            {
-                if (m_startPos > m_items[i].m_index)
-                {
-                    m_startPos = m_items[i].m_index;
-                }
-            }
+            m_items[i].OnDrag();
 
             //已经完全离开了显示区域
             if (!m_viewBounds.Intersects(GetItemBounds(m_items[i].m_index)))
@@ -181,32 +226,30 @@ public class ReusingScrollRect : ScrollRectInput
                 m_items.Remove(itemTmp);
                 itemTmp.OnHide();
 
-                //隐藏并移到缓存
-                itemTmp.gameObject.SetActive(false);
-                m_itemCatchs.Add(itemTmp);
+                if (!isRebuild)
+                {
+                    //隐藏并移到缓存
+                    itemTmp.gameObject.SetActive(false);
+                }
+                m_itemCaches.Add(itemTmp);
 
                 m_indexList[itemTmp.m_index].status =  ReusingStatus.Hide;
             }
         }
 
-        if (m_startPos > 0)
-        {
-            m_startPos--;
-        }
-
-        //Debug.Log(m_startPos);
-
-        m_clip = false;
-
         //计算出哪些需要显示
         //如果有未显示的则显示出来，从对象池取出对象
-        for (int i = m_startPos; i < m_indexList.Count; i++)
+        bool m_clip = false;
+        for (int i = 0; i < m_indexList.Count; i++)
         {
             if (m_indexList[i].status == ReusingStatus.Hide)
             {
+
                 if (m_viewBounds.Intersects(GetItemBounds(m_indexList[i].index)))
                 {
-                    ShowItem(i, m_datas[i]);
+                    ShowItem(i, isRebuild, m_datas[i]);
+
+
                     m_indexList[i].status = ReusingStatus.Show;
                     m_clip = true;
                 }
@@ -225,19 +268,23 @@ public class ReusingScrollRect : ScrollRectInput
         }
     }
 
-    void ShowItem(int index,Dictionary<string, object> data)
+    void ShowItem(int index,bool isRebuild,Dictionary<string, object> data)
     {
         ReusingScrollItemBase itemTmp = GetItem();
         itemTmp.transform.SetParent(content);
         itemTmp.transform.localScale = Vector3.one;
 
-        itemTmp.SetConetnt(index,data);
+        if (!isRebuild)
+        {
+            itemTmp.SetContent(index, data);
+        }
 
-        itemTmp.m_RectTransform.pivot = GetPivot();
-        itemTmp.m_RectTransform.anchorMin = GetMinAchors();
-        itemTmp.m_RectTransform.anchorMax = GetMaxAchors();
+        itemTmp.RectTransform.pivot = GetPivot();
+        itemTmp.RectTransform.anchorMin = GetMinAchors();
+        itemTmp.RectTransform.anchorMax = GetMaxAchors();
+        itemTmp.RectTransform.sizeDelta = GetItemSize();
 
-        itemTmp.m_RectTransform.anchoredPosition3D = GetItemPos(index);
+        itemTmp.RectTransform.anchoredPosition3D = GetItemPos(index);
 
         itemTmp.m_index = index;
     }
@@ -246,19 +293,19 @@ public class ReusingScrollRect : ScrollRectInput
     {
         ReusingScrollItemBase result = null;
 
-        if (m_itemCatchs.Count>0)
+        if (m_itemCaches.Count>0)
         {
-            result = m_itemCatchs[0];
+            result = m_itemCaches[0];
             result.gameObject.SetActive(true);
             result.OnShow();
-            m_itemCatchs.RemoveAt(0);
+            m_itemCaches.RemoveAt(0);
 
             m_items.Add(result);
             return result;
         }
 
-        result = GameObjectManager.CreatGameObjectByPool(m_itemPrefab).GetComponent<ReusingScrollItemBase>();
-        result.Init(m_items.Count);
+        result = GameObjectManager.CreateGameObjectByPool(m_itemPrefab).GetComponent<ReusingScrollItemBase>();
+        result.Init(m_UIEventKey, m_items.Count);
         m_items.Add(result);
 
         return result;
@@ -268,7 +315,6 @@ public class ReusingScrollRect : ScrollRectInput
     {
         return new Bounds(GetItemPos(index) + GetRealItemOffset() + content.localPosition, m_itemSize);
     }
-
 
     Vector3 GetItemPos(int index)
     {
@@ -357,6 +403,8 @@ public class ReusingScrollRect : ScrollRectInput
             {
                 minAchors.x = 1;
             }
+
+            minAchors.y = 0;
         }
 
         if (vertical)
@@ -369,6 +417,7 @@ public class ReusingScrollRect : ScrollRectInput
             {
                 minAchors.y = 0;
             }
+            minAchors.x = 0;
         }
 
         return minAchors;
@@ -388,6 +437,8 @@ public class ReusingScrollRect : ScrollRectInput
             {
                 maxAchors.x = 1;
             }
+
+            maxAchors.y = 1;
         }
 
         if (vertical)
@@ -400,9 +451,26 @@ public class ReusingScrollRect : ScrollRectInput
             {
                 maxAchors.y = 0;
             }
+            maxAchors.x = 1;
         }
 
         return maxAchors;
+    }
+
+    Vector2 GetItemSize()
+    {
+        Vector3 size = m_itemSize;
+
+        if (horizontal)
+        {
+            size.y = 0;
+        }
+
+        if (vertical)
+        {
+            size.x = 0;
+        }
+        return size;
     }
 
     //void OnDrawGizmos()
@@ -428,9 +496,39 @@ public class ReusingScrollRect : ScrollRectInput
 
     #endregion
 
-    #region 事件监听与转发
+    #region 动画
     
+    public void StartEnterAnim()
+    {
+        m_isReceiveControl = false;
+        StartCoroutine(EnterAnim());
+    }
 
+    public void StartExitAnim()
+    {
+        m_isReceiveControl = false;
+        StartCoroutine(ExitAnim());
+    }
+
+    void EndEnterAnim()
+    {
+        m_isReceiveControl = true;
+    }
+
+    void EndExitAnim()
+    {
+        m_isReceiveControl = true;
+    }
+
+    public virtual IEnumerator EnterAnim()
+    {
+        return null;
+    }
+
+    public virtual IEnumerator ExitAnim()
+    {
+        return null;
+    }
 
     #endregion
 

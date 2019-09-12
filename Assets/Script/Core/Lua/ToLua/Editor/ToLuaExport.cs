@@ -1,4 +1,5 @@
-﻿/*
+﻿#if USE_LUA
+/*
 Copyright (c) 2015-2016 topameng(topameng@qq.com)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -271,7 +272,7 @@ public static class ToLuaExport
             return;
         }
 
-        Debugger.Log("Begin Generate lua Wrap for class {0}", className);        
+        //Debugger.Log("Begin Generate lua Wrap for class {0}", className);        
         sb = new StringBuilder();
         usingList.Add("System");                
 
@@ -953,6 +954,7 @@ public static class ToLuaExport
         return true;
     }
 
+    //返回true跳过
     static bool IsGenericMethod(MethodInfo md)
     {
         if (md.IsGenericMethod)
@@ -989,6 +991,11 @@ public static class ToLuaExport
                 }
             }
         }
+
+        //if (md.GetCustomAttributes(typeof(NoExportToLuaAttribute),true).Length > 0)
+        //{
+        //    return true;
+        //}
 
         return false;
     }
@@ -1640,26 +1647,26 @@ public static class ToLuaExport
         {
             sb.AppendFormat("{0}LuaTable {1} = ToLua.{2}LuaTable(L, {3});\r\n", head, arg, checkStr, stackPos);
         }
-        else if (varType == typeof(Vector2))
-        {
-            sb.AppendFormat("{0}UnityEngine.Vector2 {1} = ToLua.ToVector2(L, {2});\r\n", head, arg, stackPos);
-        }
-        else if (varType == typeof(Vector3))
-        {
-            sb.AppendFormat("{0}UnityEngine.Vector3 {1} = ToLua.ToVector3(L, {2});\r\n", head, arg, stackPos);
-        }
-        else if (varType == typeof(Vector4))
-        {
-            sb.AppendFormat("{0}UnityEngine.Vector4 {1} = ToLua.ToVector4(L, {2});\r\n", head, arg, stackPos);
-        }
-        else if (varType == typeof(Quaternion))
-        {
-            sb.AppendFormat("{0}UnityEngine.Quaternion {1} = ToLua.ToQuaternion(L, {2});\r\n", head, arg, stackPos);
-        }
-        else if (varType == typeof(Color))
-        {
-            sb.AppendFormat("{0}UnityEngine.Color {1} = ToLua.ToColor(L, {2});\r\n", head, arg, stackPos);
-        }
+        //else if (varType == typeof(Vector2))
+        //{
+        //    sb.AppendFormat("{0}UnityEngine.Vector2 {1} = ToLua.ToVector2(L, {2});\r\n", head, arg, stackPos);
+        //}
+        //else if (varType == typeof(Vector3))
+        //{
+        //    sb.AppendFormat("{0}UnityEngine.Vector3 {1} = ToLua.ToVector3(L, {2});\r\n", head, arg, stackPos);
+        //}
+        //else if (varType == typeof(Vector4))
+        //{
+        //    sb.AppendFormat("{0}UnityEngine.Vector4 {1} = ToLua.ToVector4(L, {2});\r\n", head, arg, stackPos);
+        //}
+        //else if (varType == typeof(Quaternion))
+        //{
+        //    sb.AppendFormat("{0}UnityEngine.Quaternion {1} = ToLua.ToQuaternion(L, {2});\r\n", head, arg, stackPos);
+        //}
+        //else if (varType == typeof(Color))
+        //{
+        //    sb.AppendFormat("{0}UnityEngine.Color {1} = ToLua.ToColor(L, {2});\r\n", head, arg, stackPos);
+        //}
         else if (varType == typeof(Ray))
         {
             sb.AppendFormat("{0}UnityEngine.Ray {1} = ToLua.ToRay(L, {2});\r\n", head, arg, stackPos);
@@ -3546,7 +3553,7 @@ public static class ToLuaExport
         }
 
         sb.AppendLineEx("}\r\n");        
-        SaveFile(CustomSettings.saveDir + "DelegateFactory.cs");
+        SaveFile(CustomSettings.saveDir + "/DelegateFactory.cs");
 
         Clear();
     }
@@ -3848,3 +3855,4 @@ public static class ToLuaExport
         return space; 
     }
 }
+#endif

@@ -2,114 +2,254 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
+using System.IO;
 
-public static class ResourcesConfigManager 
+public static class ResourcesConfigManager
 {
-    public const string c_configFileName = "ResourcesConfig";
+    public const string c_ManifestFileName = "ResourcesManifest";
+    public const string c_PathKey = "Path";
 
-    public const string c_relyBundleKey = "relyBundles";
-    public const string c_bundlesKey = "AssetsBundles";
+    static DataTable s_config;
+    static bool s_isInit = false;
 
-    static Dictionary<string, ResourcesConfig> m_relyBundleConfigs;
-    static Dictionary<string, ResourcesConfig> m_bundleConfigs ;
-
-    public static void Initialize()
+    static void Initialize()
     {
-        Dictionary<string, SingleField> data = GetResourcesConfig();
-
-        if (data == null
-            || !data.ContainsKey(c_relyBundleKey) 
-            || !data.ContainsKey(c_bundlesKey))
-        {
-            throw new Exception("RecourcesConfigManager Initialize Exception: " + c_configFileName + "file is not exits");
-        }
-
-        m_relyBundleConfigs = JsonTool.Json2Dictionary<ResourcesConfig>(data[c_relyBundleKey].GetString());
-        m_bundleConfigs     = JsonTool.Json2Dictionary<ResourcesConfig>(data[c_bundlesKey].GetString());
+        s_isInit = true;
+        LoadResourceConfig();
     }
 
-    public static ResourcesConfig GetBundleConfig(string bundleName)
+    public static void ClearConfig()
     {
-        if (m_bundleConfigs == null)
+        s_isInit = false;
+    }
+
+    public static bool GetIsExitRes(string resName)
+    {
+        resName = resName.ToLower();
+
+        if (!s_isInit || s_config == null)
         {
-            throw new Exception("RecourcesConfigManager GetBundleConfig : bundleConfigs is null  do you Initialize?");
+            Initialize();
         }
 
-        if (m_bundleConfigs.ContainsKey(bundleName))
+        return s_config.ContainsKey(resName);
+    }
+
+    public static string GetResourcePath(string bundleName)
+    {
+        bundleName = bundleName.ToLower();
+
+        if (!s_isInit)
         {
-            return m_bundleConfigs[bundleName];
+            Initialize();
+        }
+
+        if (!s_config.ContainsKey(bundleName))
+        {
+            throw new Exception("RecourcesConfigManager can't find ->" + bundleName + "<-");
+        }
+
+        return s_config[bundleName].GetString(c_PathKey);
+    }
+    /// <summary>
+    /// 根据AssetsLoadType获取加载路径
+    /// </summary>
+    /// <param name="bundleName"></param>
+    /// <returns></returns>
+  public  static string GetLoadPath(AssetsLoadType assetsloadType, string name)
+    {
+        string path = GetResourcePath(name);
+        if (assetsloadType == AssetsLoadType.Resources)
+            return path;
+        else
+        {
+            return GetLoadPathBase(assetsloadType, path);
+        }
+    }
+    public static string GetLoadPathBase(AssetsLoadType assetsloadType, string path)
+    {
+//#if !UNITY_WEBGL
+
+        bool isLoadByPersistent = RecordManager.GetData(HotUpdateManager.c_HotUpdateRecordName).GetRecord(path, "null") == "null" ? false : true;
+        ResLoadLocation loadType = ResLoadLocation.Streaming;
+
+        //加载路径由 加载根目录 和 相对路径 合并而成
+        //加载根目录由配置决定
+        if (isLoadByPersistent)
+        {
+            loadType = ResLoadLocation.Persistent;
+            return PathTool.GetAssetsBundlePersistentPath() + path;
         }
         else
         {
-            throw new Exception("RecourcesConfigManager GetBundleConfig : Dont find " + bundleName + " please check BundleConfig!");
+            loadType = ResLoadLocation.Streaming;
+            return PathTool.GetAbsolutePath(loadType, path);
         }
+
+//#else
+//        return PathTool.GetLoadURL(config.path + "." + c_AssetsBundlesExpandName);
+//#endif
     }
-
-    public static ResourcesConfig GetRelyBundleConfig(string bundleName)
+    public static void LoadResourceConfig()
     {
-        if (m_relyBundleConfigs == null)
-        {
-            throw new Exception("RecourcesConfigManager GetRelyBundleConfig Exception: relyBundleConfigs is null do you Initialize?");
-        }
+#if !UNITY_WEBGL
+        string data = "";
 
-        if (m_relyBundleConfigs.ContainsKey(bundleName))
+        if (ResourceManager.LoadType ==  AssetsLoadType.Resources)
         {
-            return m_relyBundleConfigs[bundleName];
+            data = ResourceIOTool.ReadStringByResource(c_ManifestFileName + "." + DataManager.c_expandName);
         }
         else
         {
-            throw new Exception("RecourcesConfigManager GetRelyBundleConfig Exception: Dont find " + bundleName + " please check BundleConfig!");
+            ResLoadLocation type = ResLoadLocation.Streaming;
+            if (RecordManager.GetData(HotUpdateManager.c_HotUpdateRecordName).GetRecord(c_ManifestFileName.ToLower(), "null") != "null")
+            {
+                Debug.Log("LoadResourceConfig 读取沙盒路径");
+
+                type = ResLoadLocation.Persistent;
+                //更新资源存放在Application.persistentDataPath+"/Resources/"目录下
+                string persistentPath = PathTool.GetAssetsBundlePersistentPath() + c_ManifestFileName.ToLower();
+  
+                AssetBundle ab = AssetBundle.LoadFromFile(persistentPath);
+
+                TextAsset text = (TextAsset)ab.LoadAsset<TextAsset>(c_ManifestFileName);
+                data = text.text;
+
+            }
+            else
+            {
+                //Debug.Log("LoadResourceConfig 读取stream路径");
+
+                string path = PathTool.GetAbsolutePath(type, c_ManifestFileName.ToLower());
+                AssetBundle ab = AssetBundle.LoadFromFile(path);
+
+                TextAsset text = ab.LoadAsset<TextAsset>(c_ManifestFileName);
+                data = text.text;
+
+                ab.Unload(true);
+            }
+        }
+
+        s_config = DataTable.Analysis(data);
+
+#else
+        return WEBGLReadResourceConfigContent();
+#endif
+    }
+
+#if UNITY_EDITOR
+
+    public const string c_ResourceParentPath = "/Resources/";
+    public const string c_MainKey = "Res";
+    static int direIndex = 0;
+
+    public static bool GetIsExistResources()
+    {
+        string resourcePath = Application.dataPath + c_ResourceParentPath;
+        return Directory.Exists(resourcePath);
+    }
+
+    public static void CreateResourcesConfig()
+    {
+        string content = DataTable.Serialize(GenerateResourcesConfig());
+        string path = PathTool.GetAbsolutePath(ResLoadLocation.Resource,c_ManifestFileName + "." + DataManager.c_expandName);
+
+        ResourceIOTool.WriteStringByFile(path, content);
+    }
+
+    /// <summary>
+    /// 生成资源清单路径，仅在Editor下可以调用
+    /// </summary>
+    /// <returns></returns>
+    public static DataTable GenerateResourcesConfig()
+    {
+        DataTable data = new DataTable();
+
+        data.TableKeys.Add(c_MainKey);
+
+        data.TableKeys.Add(c_PathKey);
+        data.SetDefault(c_PathKey, "资源相对路径");
+        data.SetFieldType(c_PathKey, FieldType.String, null);
+
+        string resourcePath = Application.dataPath + c_ResourceParentPath;
+        direIndex = resourcePath.LastIndexOf(c_ResourceParentPath);
+        direIndex += c_ResourceParentPath.Length;
+
+        RecursionAddResouces(data, resourcePath);
+
+        return data;
+    }
+
+    static void RecursionAddResouces(DataTable data,string path)
+    {
+        if (!File.Exists(path))
+        {
+            FileTool.CreatPath(path);
+        }
+
+        string[] dires = Directory.GetDirectories(path);
+
+        for (int i = 0; i < dires.Length; i++)
+        {
+            RecursionAddResouces(data,dires[i]);
+        }
+
+        string[] files = Directory.GetFiles(path);
+
+        for (int i = 0; i < files.Length; i++)
+        {
+            string fileName = FileTool.RemoveExpandName(FileTool.GetFileNameByPath(files[i]));
+            string relativePath = files[i].Substring(direIndex);
+            if (relativePath.EndsWith(".meta") || relativePath.EndsWith(".DS_Store"))
+                continue;
+            else
+            {
+                relativePath = FileTool.RemoveExpandName(relativePath).Replace("\\","/");
+
+                SingleData sd = new SingleData();
+                sd.Add(c_MainKey, fileName.ToLower());
+                sd.Add(c_PathKey, relativePath.ToLower());
+
+                if(fileName.Contains(" "))
+                {
+                    Debug.LogError("文件名中有空格！ ->" + fileName + "<-");
+                }
+                else
+                {
+                    if (!data.ContainsKey(fileName.ToLower()))
+                    {
+                        data.AddData(sd);
+                    }
+                    else
+                    {
+                        Debug.LogError("GenerateResourcesConfig error 存在重名文件！" + relativePath);
+                    }
+                }
+            }
         }
     }
 
-    //资源路径数据不依赖任何其他数据
-    static Dictionary<string, SingleField> GetResourcesConfig()
+#endif
+
+#if UNITY_WEBGL
+    //WEbGL 下获取Bundle Setting
+    static string WEBGLReadResourceConfigContent()
     {
         string dataJson = "";
 
-        if (ResourceManager.m_gameLoadType == ResLoadType.Resource)
-        {
+        //if (ResourceManager.m_gameLoadType == ResLoadLocation.Resource)
+        //{
             dataJson = ResourceIOTool.ReadStringByResource(
-                PathTool.GetRelativelyPath(ConfigManager.c_directoryName,
-                                            c_configFileName,
-                                            ConfigManager.c_expandName));
-        }
-        else
-        {
-            ResLoadType type = ResLoadType.Streaming;
+                c_ManifestFileName + "." + ConfigManager.c_expandName);
+        //}
+        //else
+        //{
+        //    dataJson = ResourceIOTool.ReadStringByBundle(
+        //    PathTool.GetLoadURL(c_ManifestFileName + "." + AssetsBundleManager.c_AssetsBundlesExpandName)
+        //    );
+        //}
 
-            if(RecordManager.GetData(AssetsBundleManager.c_HotUpdateRecordName).GetRecord(c_configFileName,false))
-            {
-                type = ResLoadType.Persistent;
-            }
-
-            dataJson = ResourceIOTool.ReadStringByBundle(
-                PathTool.GetAbsolutePath(
-                     type,
-                     PathTool.GetRelativelyPath(
-                                     ConfigManager.c_directoryName,
-                                     c_configFileName,
-                                     AssetsBundleManager.c_AssetsBundlesExpandName)));
-        }
-
-        if (dataJson == "")
-        {
-            throw new Exception("ResourcesConfig not find " + c_configFileName);
-        }
-        else
-        {
-            return JsonTool.Json2Dictionary<SingleField>(dataJson);
-        }
+        return dataJson;
     }
+#endif
 }
-
-public class ResourcesConfig
-{
-    public string name;               //名称
-    public string path;               //加载相对路径
-    public string[] relyPackages;     //依赖包
-    public string md5;                //md5
-    //[System.NonSerialized]
-    //public ResLoadType loadType;      //加载类型
-}
-

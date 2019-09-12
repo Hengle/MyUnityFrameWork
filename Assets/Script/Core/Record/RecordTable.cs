@@ -27,7 +27,7 @@ public class RecordTable : Dictionary<string, SingleField>
 
     public static string Serialize(RecordTable table)
     {
-        return JsonTool.Dictionary2Json<SingleField>(table); ;
+        return JsonTool.Dictionary2Json<SingleField>(table);
     }
 
     #endregion
@@ -54,7 +54,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetString();
+            return defaultValue;
         }
     }
 
@@ -66,7 +66,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetBool();
+            return defaultValue;
         }
     }
 
@@ -78,7 +78,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetInt();
+            return defaultValue;
         }
     }
 
@@ -90,7 +90,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetFloat();
+            return defaultValue;
         }
     }
 
@@ -102,7 +102,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetVector2();
+            return defaultValue;
         }
     }
 
@@ -114,7 +114,7 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetVector3();
+            return defaultValue;
         }
     }
 
@@ -126,7 +126,19 @@ public class RecordTable : Dictionary<string, SingleField>
         }
         else
         {
-            return new SingleField(defaultValue).GetColor();
+            return defaultValue;
+        }
+    }
+
+    public T GetEnumRecord<T>(string key, T defaultValue) where T:struct
+    {
+        if (this.ContainsKey(key))
+        {
+            return this[key].GetEnum<T>();
+        }
+        else
+        {
+            return defaultValue;
         }
     }
 
@@ -215,6 +227,18 @@ public class RecordTable : Dictionary<string, SingleField>
         else
         {
             this.Add(key, new SingleField(value));
+        }
+    }
+
+    public void SetEnumRecord(string key, Enum value)
+    {
+        if (this.ContainsKey(key))
+        {
+            this[key] = new SingleField(value.ToString());
+        }
+        else
+        {
+            this.Add(key, new SingleField(value.ToString()));
         }
     }
 

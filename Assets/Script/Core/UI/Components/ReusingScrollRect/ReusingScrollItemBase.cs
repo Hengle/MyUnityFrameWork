@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-public class ReusingScrollItemBase : UIBase 
+public class ReusingScrollItemBase : UIBase
 {
     public int m_index = 0;
 
@@ -16,7 +16,12 @@ public class ReusingScrollItemBase : UIBase
 
     }
 
-    public virtual void SetConetnt(int index,Dictionary<string, object> data)
+    public virtual void SetContent(int index,Dictionary<string, object> data)
+    {
+
+    }
+
+    public virtual void OnDrag()
     {
 
     }

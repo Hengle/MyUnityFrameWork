@@ -39,6 +39,7 @@ public class GUIConsole
 
     static public OnUpdateCallback onUpdateCallback = null;
     static public OnGUICallback onGUICallback = null;
+    static public OnGUICallback onGUICloseCallback = null;
     /// <summary>
     /// FPS计数器
     /// </summary>
@@ -46,11 +47,11 @@ public class GUIConsole
     /// <summary>
     /// 内存监视器
     /// </summary>
-    static private MemoryDetector memoryDetector = null;
+    //static private MemoryDetector memoryDetector = null;
     static private bool showGUI = false;
     static List<ConsoleMessage> entries = new List<ConsoleMessage>();
     static Vector2 scrollPos;
-    static bool scrollToBottom = true;
+    //static bool scrollToBottom = true;
     static bool collapse;
 
 #if !UNITY_EDITOR&&UNITY_ANDROID || UNITY_IOS
@@ -59,29 +60,27 @@ public class GUIConsole
 
     const int margin = 3;
     const int offset = 0;
-    static Rect windowRect = new Rect(margin + Screen.width * 0.5f - offset, margin, Screen.width * 0.5f - (2 * margin) + offset, Screen.height - (2 * margin));
+    static Rect windowRect = new Rect(margin + Screen.width * 0.6f - offset, margin, Screen.width * 0.6f - (2 * margin) + offset, Screen.height - (2 * margin));
 
     public static void Init()
     {
         fpsCounter = new FPSCounter();
         fpsCounter.Init();
-        memoryDetector = new MemoryDetector();
-        memoryDetector.Init();
+        //memoryDetector = new MemoryDetector();
+        //memoryDetector.Init();
 
         ApplicationManager.s_OnApplicationUpdate += Update;
         ApplicationManager.s_OnApplicationOnGUI += OnGUI;
-        Application.logMessageReceived += HandleLog;
 
-        //consoleStyle = GUI.skin.label;
-
-        //consoleStyle.fontSize = 20;
+        Application.logMessageReceivedThreaded += HandleLog;
+        //Application.logMessageReceived += HandleLog;
     }
 
     ~GUIConsole()
     {
-        Application.logMessageReceived -= HandleLog;
+        Application.logMessageReceivedThreaded -= HandleLog;
+        //Application.logMessageReceived -= HandleLog;
     }
-
 
     static void Update()
     {
@@ -105,53 +104,59 @@ public class GUIConsole
     static void OnGUI()
     {
         if (!showGUI)
+        {
+            if(onGUICloseCallback != null)
+            {
+                onGUICloseCallback();
+            }
             return;
+        }
 
         GUIUtil.SetGUIStyle();
 
         if (onGUICallback != null)
             onGUICallback();
 
-        //if (GUI.Button (new Rect (100, 100, 200, 100), "清空数据")) {
-        //    PlayerPrefs.DeleteAll ();
-        //    #if UNITY_EDITOR
-        //    EditorApplication.isPlaying = false;
-        //    #else
-        //    Application.Quit();
-        //    #endif
-        //}
-        windowRect = new Rect(margin + Screen.width * 0.5f ,
+        windowRect = new Rect(margin + Screen.width * 0.2f ,
                                 margin,
-                                Screen.width * 0.5f - (2 * margin),
+                                Screen.width * 0.8f - (2 * margin),
                                 Screen.height - (2 * margin));
 
         GUILayout.Window(100, windowRect, ConsoleWindow, "Console");
     }
 
+    static int s_page = 0;
+    const int c_perPageShowDebug = 50;
 
     /// <summary>
     /// A window displaying the logged messages.
     /// </summary>
     static void ConsoleWindow(int windowID)
     {
+        //if (scrollToBottom)
+        //{
+        //    GUILayout.BeginScrollView(Vector2.up * entries.Count * 1000.0f);
+        //} 
+        //else
+        //{
+        //    
+        //}
 
-        if (scrollToBottom)
+        scrollPos = GUILayout.BeginScrollView(scrollPos);
+
+        int startIndex = s_page * c_perPageShowDebug;
+        int endIndex = startIndex + c_perPageShowDebug;
+
+        if(endIndex > entries.Count)
         {
-            GUILayout.BeginScrollView(Vector2.up * entries.Count * 100.0f);
-        } 
-        else
-        {
-            scrollPos = GUILayout.BeginScrollView(scrollPos);
+            endIndex = entries.Count;
         }
+
         // Go through each logged entry
-        for (int i = 0; i < entries.Count; i++)
+        for (int i = startIndex; i < endIndex; i++)
         {
             ConsoleMessage entry = entries[i];
-            // If this message is the same as the last one and the collapse feature is chosen, skip it
-            if (collapse && i > 0 && entry.message == entries[i - 1].message)
-            {
-                continue;
-            }
+
             // Change the text colour according to the log type
             switch (entry.type)
             {
@@ -167,8 +172,6 @@ public class GUIConsole
                     break;
             }
 
-
-
             if (entry.type == LogType.Exception)
             {
                 GUILayout.Label(entry.message + " || " + entry.stackTrace);
@@ -179,25 +182,55 @@ public class GUIConsole
             }
         }
         GUI.contentColor = Color.white;
+
         GUILayout.EndScrollView();
+        GUILayout.BeginHorizontal();
+
+        GUILayout.Label("第" + (s_page + 1) + "页 共" + Mathf.Ceil(entries.Count / (float)c_perPageShowDebug) + "页");
+
+        if (s_page > 0)
+        {
+            if (GUILayout.Button("上一页"))
+            {
+                s_page--;
+            }
+        }
+
+        if(entries.Count > (s_page + 1) * c_perPageShowDebug)
+        {
+            if (GUILayout.Button("下一页"))
+            {
+                s_page++;
+            }
+        }
+
+        GUILayout.EndHorizontal();
+
+        GUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("首页"))
+        {
+            s_page = 0;
+        }
+
+        if (GUILayout.Button("末页"))
+        {
+            s_page = entries.Count / c_perPageShowDebug;
+        }
+
+        GUILayout.EndHorizontal();
+
         // Clear button
         if (GUILayout.Button("Clear"))
         {
             entries.Clear();
         }
 
-        if (GUILayout.Button("Collapse:" + collapse))
-        {
-            collapse = !collapse;
-        }
+        //if (GUILayout.Button("Bottom:" + scrollToBottom))
+        //{
+        //    scrollToBottom = !scrollToBottom;
+        //}
 
-        if (GUILayout.Button("Bottom:" + scrollToBottom))
-        {
-            scrollToBottom = !scrollToBottom;
-        }
-
-        // Set the window to be draggable by the top title bar
-        //GUI.DragWindow(new Rect(0, 0, 10000, 20));
     }
 
     static void HandleLog(string message, string stackTrace, LogType type)

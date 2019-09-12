@@ -6,11 +6,13 @@ using System;
 using System.Reflection;
 using System.Collections.Generic;
 using System.IO;
+using FrameWork;
+
 public class ConfigEditorWindow : EditorWindow
 {
     UILayerManager m_UILayerManager;
 
-    [MenuItem("Window/配置编辑器", priority = 500)]
+    [MenuItem("Window/配置编辑器 &4", priority = 502)]
     public static void ShowWindow()
     {
         EditorWindow.GetWindow(typeof(ConfigEditorWindow));
@@ -44,7 +46,7 @@ public class ConfigEditorWindow : EditorWindow
 
         AddConfigGUI();
 
-        CleanCatchGUI();
+        CleanCacheGUI();
 
 
         EditorGUILayout.EndVertical();
@@ -118,7 +120,7 @@ public class ConfigEditorWindow : EditorWindow
                 if (GUILayout.Button("新增", GUILayout.Width(position.width - 60)))
                 {
                     Dictionary<string,SingleField> dict = new Dictionary<string,SingleField>();
-                    ConfigManager.SaveData(configName, dict);
+                    SaveData(configName, dict);
 
                     LoadConfig(configName);
 
@@ -155,9 +157,9 @@ public class ConfigEditorWindow : EditorWindow
         }
     }
 
-    public void CleanCatchGUI()
+    public void CleanCacheGUI()
     {
-        ConfigManager.CleanCatch();
+        ConfigManager.CleanCache();
     }
 
     #endregion
@@ -293,7 +295,15 @@ public class ConfigEditorWindow : EditorWindow
 
             for (int i = 0; i < keys.Count; i++)
             {
-                ConfigItemGUI(m_currentConfig, keys[i]);
+                try
+                {
+                    ConfigItemGUI(m_currentConfig, keys[i]);
+                }
+                catch(Exception e)
+                {
+                    GUILayout.Label(e.ToString(), EditorGUIStyleData.ErrorMessageLabel);
+                }
+
             }
 
             EditorGUILayout.Space();
@@ -303,7 +313,7 @@ public class ConfigEditorWindow : EditorWindow
             EditorGUILayout.Space();
             if (GUILayout.Button("保存"))
             {
-                ConfigManager.SaveData(m_currentConfigName, m_currentConfig);
+                SaveData(m_currentConfigName, m_currentConfig);
                 AssetDatabase.Refresh();
             }
 
@@ -329,22 +339,64 @@ public class ConfigEditorWindow : EditorWindow
 
     public void FindConfigName(string path)
     {
+        FileTool.CreatPath(path);
+
         string[] allUIPrefabName = Directory.GetFiles(path);
         foreach (var item in allUIPrefabName)
         {
-            
             if (item.EndsWith(".json"))
             {
                 string configName = FileTool.RemoveExpandName(FileTool.GetFileNameByPath(item));
                 m_configNameList.Add(configName);
             }
         }
+    }
 
-        //string[] dires = Directory.GetDirectories(path);
-        //for (int i = 0; i < dires.Length; i++)
-        //{
-        //    FindConfigName(dires[i]);
-        //}
+    public static string GetConfigPath(string configName)
+    {
+        return PathTool.GetAbsolutePath(ResLoadLocation.Resource,
+            PathTool.GetRelativelyPath(ConfigManager.c_directoryName,
+                                                configName,
+                                                ConfigManager.c_expandName));
+    }
+
+    #endregion
+
+    #region 保存配置
+
+    public static void SaveData(string ConfigName, Dictionary<string, SingleField> data)
+    {
+        EditorUtil.WriteStringByFile(PathTool.GetAbsolutePath(ResLoadLocation.Resource,
+            PathTool.GetRelativelyPath(ConfigManager.c_directoryName,
+                                                ConfigName,
+                                                ConfigManager.c_expandName)),
+                                        JsonTool.Dictionary2Json<SingleField>(data));
+
+        UnityEditor.AssetDatabase.Refresh();
+    }
+    public static Dictionary<string, object> GetEditorConfigData(string ConfigName)
+    {
+      //  UnityEditor.AssetDatabase.Refresh();
+
+        string dataJson = ResourceIOTool.ReadStringByFile(PathTool.GetEditorPath(ConfigManager.c_directoryName, ConfigName, ConfigManager.c_expandName));
+
+        if (dataJson == "")
+        {
+            return null;
+        }
+        else
+        {
+            return Json.Deserialize(dataJson) as Dictionary<string, object>;
+        }
+    }
+
+    public static void SaveEditorConfigData(string ConfigName, Dictionary<string, object> data)
+    {
+        string configDataJson = Json.Serialize(data);
+
+        EditorUtil.WriteStringByFile(PathTool.GetEditorPath(ConfigManager.c_directoryName, ConfigName, ConfigManager.c_expandName), configDataJson);
+
+        UnityEditor.AssetDatabase.Refresh();
     }
 
     #endregion

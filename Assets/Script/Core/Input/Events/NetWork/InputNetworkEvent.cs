@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using MiniJSON;
+using FrameWork;
 
 public class InputNetworkMessageEvent : IInputEventBase
 {
@@ -22,7 +22,15 @@ public class InputNetworkMessageEvent : IInputEventBase
         get {
             if (m_data == null)
             {
-                m_data = Json.Deserialize(m_content) as Dictionary<string, object>;
+                if (m_content != null && m_content != "")
+                {
+                    m_data = DevelopReplayManager.Deserializer.Deserialize<Dictionary<string, object>>(m_content);
+                }
+                else
+                {
+                    m_data = new Dictionary<string, object>();
+                }
+
             }
 
             return m_data;
@@ -33,9 +41,25 @@ public class InputNetworkMessageEvent : IInputEventBase
         }
     }
 
+    public override void Reset()
+    {
+        base.Reset();
+        m_content = null;
+    }
+
     protected override string GetEventKey()
     {
         return m_MessgaeType;
+    }
+
+    public override string Serialize()
+    {
+        if (m_content == null || m_content == "")
+        {
+            m_content = Serializer.Serialize(Data);
+        }
+
+        return base.Serialize();
     }
 
 }
@@ -43,6 +67,11 @@ public class InputNetworkMessageEvent : IInputEventBase
 public class InputNetworkConnectStatusEvent : IInputEventBase
 {
     public NetworkState m_status;
+
+    public InputNetworkConnectStatusEvent()
+    {
+        m_status = NetworkState.ConnectBreak;
+    }
 
     public InputNetworkConnectStatusEvent(NetworkState status)
     {

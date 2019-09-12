@@ -10,7 +10,7 @@ public class RecordEditorWindow : EditorWindow
 {
     UILayerManager m_UILayerManager;
 
-    [MenuItem("Window/持久数据编辑器", priority = 500)]
+    [MenuItem("Window/持久数据编辑器 &3", priority = 501)]
     public static void ShowWindow()
     {
         EditorWindow.GetWindow(typeof(RecordEditorWindow));
@@ -43,7 +43,7 @@ public class RecordEditorWindow : EditorWindow
 
         AddRecordGUI();
 
-        CleanCatchGUI();
+        CleanCacheGUI();
 
         EditorGUILayout.EndVertical();
     }
@@ -135,8 +135,9 @@ public class RecordEditorWindow : EditorWindow
             {
                 if (EditorUtility.DisplayDialog("警告", "确定要删除该数据吗！", "是", "取消"))
                 {
-                    File.Delete(Application.dataPath + "/Resources/" + RecordManager.c_directoryName + "/" + m_currentRecordName + ".json");
+                    File.Delete(Application.persistentDataPath + "/" + RecordManager.c_directoryName + "/" + m_currentRecordName + ".json");
                     AssetDatabase.Refresh();
+                    FindAllRecordName();
                 }
             }
         }
@@ -151,11 +152,11 @@ public class RecordEditorWindow : EditorWindow
         }
     }
 
-    void CleanCatchGUI()
+    void CleanCacheGUI()
     {
         if (GUILayout.Button("清空缓存"))
         {
-            RecordManager.CleanCatch();
+            RecordManager.CleanCache();
         }
     }
 

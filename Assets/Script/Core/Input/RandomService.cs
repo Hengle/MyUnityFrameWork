@@ -3,12 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System;
 
-public class RandomService 
+public class RandomService
 {
     static RandomHandel s_onRandomCreat;
 
     static bool s_isFixedRandom = false;
-    static List<int> s_randomList;
+    static List<int> s_randomList = new List<int>();
 
     public static RandomHandel OnRandomCreat
     {
@@ -22,6 +22,11 @@ public class RandomService
         s_randomList = list;
     }
 
+    public static int GetRandomListCount()
+    {
+        return s_randomList.Count;
+    }
+
     public static int GetRand(int min, int max)
     {
         return Range(min, max);
@@ -32,9 +37,9 @@ public class RandomService
         return Range(min, max + 1);
     }
 
-	public static int Range(int min,int max)
+    public static int Range(int min, int max)
     {
-        if(!s_isFixedRandom)
+        if (!s_isFixedRandom)
         {
             int random = UnityEngine.Random.Range(min, max);
 
@@ -88,8 +93,48 @@ public class RandomService
         }
     }
 
+    public class FixRandom
+    {
+        public int m_RandomSeed = 0;
 
+        int m_randomA = 9301;
+        int m_randomB = 49297;
+        int m_randomC = 233280;
 
+        public FixRandom(int seed)
+        {
+            SetFixRandomSeed(seed);
+        }
+
+        public void SetFixRandomSeed(int seed)
+        {
+            m_RandomSeed = seed;
+        }
+
+        public void SetFixRandomParm(int a, int b, int c)
+        {
+            m_randomA = a;
+            m_randomB = b;
+            m_randomC = c;
+        }
+
+        public int GetFixRandom()
+        {
+            m_RandomSeed = Math.Abs((m_RandomSeed * m_randomA + m_randomB) % m_randomC);
+
+            return m_RandomSeed;
+        }
+
+        public int Range(int min, int max)
+        {
+            if (max <= min)
+                return min;
+            int random = GetFixRandom();
+            int range = max - min;
+            int res = (random % range) + min;
+            return res;
+        }
+    }
 }
 
 public delegate void RandomHandel(int random);

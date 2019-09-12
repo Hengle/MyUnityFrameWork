@@ -1,13 +1,12 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using MiniJSON;
+using FrameWork;
 using System.Text;
 using System;
 
 /// <summary>
-/// 配置管理器，可读可写，可同步，有默认值
-/// 不通过ResourceManager加载,也不受热更新影响
+/// 配置管理器，只读
 /// </summary>
 public static class ConfigManager 
 {
@@ -17,39 +16,38 @@ public static class ConfigManager
     /// <summary>
     /// 配置缓存
     /// </summary>
-    static Dictionary<string, Dictionary<string, SingleField>> s_configCatch = new Dictionary<string,Dictionary<string, SingleField>>();
+    static Dictionary<string, Dictionary<string, SingleField>> s_configCache = new Dictionary<string,Dictionary<string, SingleField>>();
 
     public static bool GetIsExistConfig(string ConfigName)
     {
-        string dataJson = ResourceManager.ReadTextFile(ConfigName);
-
-        if (dataJson == "")
-        {
-            return false;
-        }
-        else
-        {
-            return true;
-        }
+        return ResourcesConfigManager.GetIsExitRes(ConfigName);
     }
 
     public static Dictionary<string, SingleField> GetData(string ConfigName)
     {
-        if (s_configCatch.ContainsKey(ConfigName))
+        if (s_configCache.ContainsKey(ConfigName))
         {
-            return s_configCatch[ConfigName];
+            return s_configCache[ConfigName];
         }
 
         string dataJson = "";
 
-        #if UNITY_EDITOR
-                dataJson = ResourceIOTool.ReadStringByResource( 
-                    PathTool.GetRelativelyPath(c_directoryName,
-                                                ConfigName,
-                                                c_expandName));
-        #else
-                dataJson = ResourceManager.ReadTextFile(ConfigName);
-        #endif
+        //#if UNITY_EDITOR
+        if (!Application.isPlaying)
+        {
+            dataJson = ResourceIOTool.ReadStringByResource(
+                PathTool.GetRelativelyPath(c_directoryName,
+                            ConfigName,
+                            c_expandName));
+        }
+
+        //#else
+        else
+        {
+            dataJson = ResourceManager.LoadText(ConfigName);
+        }
+        //#endif
+
 
         if (dataJson == "")
         {
@@ -59,54 +57,22 @@ public static class ConfigManager
         {
             Dictionary<string, SingleField> config = JsonTool.Json2Dictionary<SingleField>(dataJson);
 
-            s_configCatch.Add(ConfigName, config);
+            s_configCache.Add(ConfigName, config);
             return config;
         }
     }
 
-    public static void CleanCatch()
+    public static SingleField GetData(string ConfigName,string key)
     {
-        s_configCatch.Clear();
+        return GetData(ConfigName)[key];
     }
 
-
-//只在编辑器下能够使用
-#if UNITY_EDITOR
-
-    public static void SaveData(string ConfigName, Dictionary<string, SingleField> data)
+    public static void CleanCache()
     {
-        ResourceIOTool.WriteStringByFile(PathTool.GetAbsolutePath(ResLoadType.Resource,
-            PathTool.GetRelativelyPath(c_directoryName,
-                                                ConfigName,
-                                                c_expandName)),
-                                        JsonTool.Dictionary2Json<SingleField>(data));
-
-        UnityEditor.AssetDatabase.Refresh();
-    }
-
-    public static Dictionary<string, object> GetEditorConfigData(string ConfigName)
-    {
-        UnityEditor.AssetDatabase.Refresh();
-
-        string dataJson = ResourceIOTool.ReadStringByFile(PathTool.GetEditorPath(c_directoryName, ConfigName, c_expandName));
-
-        if (dataJson == "")
+        foreach (var item in s_configCache.Keys)
         {
-            return null;
+            ResourceManager.DestoryAssetsCounter(item);
         }
-        else
-        {
-            return Json.Deserialize(dataJson) as Dictionary<string, object>;
-        }
+        s_configCache.Clear();
     }
-
-    public static void SaveEditorConfigData(string ConfigName, Dictionary<string, object> data)
-    {
-        string configDataJson = Json.Serialize(data);
-
-        ResourceIOTool.WriteStringByFile(PathTool.GetEditorPath(c_directoryName, ConfigName, c_expandName), configDataJson);
-
-        UnityEditor.AssetDatabase.Refresh();
-    }
-#endif
 }

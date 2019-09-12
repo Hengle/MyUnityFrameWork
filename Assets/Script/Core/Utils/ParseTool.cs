@@ -2,14 +2,45 @@
 using System.Collections;
 using System;
 
-public class ParseTool : MonoBehaviour 
+public static class ParseTool  
 {
 
-	public static Vector2 String2Vector2(string value)
+    public static float[] String2FloatArray(string value)
+    {
+        string[] strArray = String2StringArray(value);
+        float[] array = new float[strArray.Length];
+
+        for (int i = 0; i < strArray.Length; i++)
+        {
+            float tmp = float.Parse(strArray[i]);
+
+            array[i] = tmp;
+        }
+
+        return array;
+    }
+
+    public static bool[] String2BoolArray(string value)
+    {
+        string[] strArray = String2StringArray(value);
+        bool[] array = new bool[strArray.Length];
+
+        for (int i = 0; i < strArray.Length; i++)
+        {
+            bool tmp = bool.Parse(strArray[i]);
+
+            array[i] = tmp;
+        }
+
+        return array;
+    }
+
+
+    public static Vector2 String2Vector2(string value)
     {
         try
         {
-            string[] values = value.Split('|');
+            string[] values = value.Split(',');
             float x = float.Parse(values[0]);
             float y = float.Parse(values[1]);
 
@@ -21,11 +52,28 @@ public class ParseTool : MonoBehaviour
         }
     }
 
-    public static Vector2 String2Vector3(string value)
+    public static Vector2[] String2Vector2Array(string value)
+    {
+        string[] strArray = String2StringArray(value);
+        Vector2[] array = new Vector2[strArray.Length];
+
+        for (int i = 0; i < strArray.Length; i++)
+        {
+            string[] values = strArray[i].Split(',');
+            float x = float.Parse(values[0]);
+            float y = float.Parse(values[1]);
+
+            array[i] = new Vector2(x, y);
+        }
+
+        return array;
+    }
+
+    public static Vector3 String2Vector3(string value)
     {
         try
         {
-            string[] values = value.Split('|');
+            string[] values = value.Split(',');
             float x = float.Parse(values[0]);
             float y = float.Parse(values[1]);
             float z = float.Parse(values[2]);
@@ -38,11 +86,30 @@ public class ParseTool : MonoBehaviour
         }
     }
 
+    public static Vector3[] String2Vector3Array(string value)
+    {
+        string[] strArray = String2StringArray(value);
+        Vector3[] array = new Vector3[strArray.Length];
+
+        for (int i = 0; i < strArray.Length; i++)
+        {
+            string[] values = strArray[i].Split(',');
+            float x = float.Parse(values[0]);
+            float y = float.Parse(values[1]);
+            float z = float.Parse(values[2]);
+
+            array[i] = new Vector3(x, y , z);
+        }
+
+        return array;
+    }
+
+
     public static Color String2Color(string value)
     {
         try
         {
-            string[] values = value.Split('|');
+            string[] values = value.Split(',');
             float r = float.Parse(values[0]);
             float g = float.Parse(values[1]);
             float b = float.Parse(values[2]);
@@ -61,6 +128,38 @@ public class ParseTool : MonoBehaviour
         }
     }
 
+    static string[] c_NullStringArray = new string[0];
 
+    public static string[] String2StringArray(string value)
+    {
+        if (value != null
+                && value != ""
+                && value != "null"
+                && value != "Null"
+                && value != "NULL"
+                && value != "None")
+        {
+            return value.Split('|');
+        }
+        else
+        {
+            return c_NullStringArray;
+        }
 
+    }
+
+    public static int[] String2IntArray(string value)
+    {
+        int[] intArray = null;
+        if (!string.IsNullOrEmpty(value))
+        {
+            string[] strs = value.Split('|');
+            intArray = Array.ConvertAll(strs, s => int.Parse(s));
+            return intArray;
+        }
+        else
+        {
+            return new int[0];
+        }
+    }
 }
